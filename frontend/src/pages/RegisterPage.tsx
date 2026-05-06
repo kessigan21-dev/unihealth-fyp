@@ -1,189 +1,196 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import AuthLayout from "../layouts/AuthLayout";
+import { Link, useNavigate } from "react-router-dom";
+import { Stethoscope } from "lucide-react";
 import { supabase } from "../services/supabase";
 
-function RegisterPage() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [role, setRole] = useState("student");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function RegisterPage() {
+  const navigate = useNavigate();
 
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+  const [fullName, setFullName] = useState("");
+  const [matricNo, setMatricNo] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [faculty, setFaculty] = useState("");
+  const [programme, setProgramme] = useState("");
+  const [yearOfStudy, setYearOfStudy] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
-    setErrorMessage("");
+    setLoading(true);
 
-    if (!fullName || !email || !phoneNumber || !role || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all fields.");
-      return;
-    }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone_number: phoneNumber,
-            role: role,
-          },
-        },
-      });
-
-      if (error) {
-        setErrorMessage(error.message);
-        return;
-      }
-
-      setMessage("Registration successful. Please check your email for confirmation if required.");
-      setFullName("");
-      setEmail("");
-      setPhoneNumber("");
-      setRole("student");
-      setPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      setErrorMessage("Something went wrong. Please try again.");
-      console.error("Register error:", error);
-    } finally {
+    if (error) {
+      setMessage(error.message);
       setLoading(false);
+      return;
     }
+
+    const user = data.user;
+
+    if (!user) {
+      setMessage("Registration failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: user.id,
+      full_name: fullName,
+      email,
+      role: "student",
+      phone,
+    });
+
+    if (profileError) {
+      setMessage(profileError.message);
+      setLoading(false);
+      return;
+    }
+
+    const { error: studentError } = await supabase.from("students").insert({
+      id: user.id,
+      matric_no: matricNo,
+      faculty,
+      programme,
+      year_of_study: yearOfStudy ? Number(yearOfStudy) : null,
+    });
+
+    if (studentError) {
+      setMessage(studentError.message);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    navigate("/student");
   };
 
   return (
-    <AuthLayout
-      title="Create Account"
-      subtitle="Register to access the UniHealth system"
-    >
-      <form className="space-y-5" onSubmit={handleRegister}>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Full Name
-          </label>
-          <input
-            type="text"
-            placeholder="Enter your full name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-5xl grid md:grid-cols-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+        <div className="bg-blue-600 p-10 text-white flex flex-col justify-between">
+          <div>
+            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mb-6">
+              <Stethoscope className="w-8 h-8" />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Email
-          </label>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+            <h1 className="text-4xl font-bold">Create Student Account</h1>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            placeholder="Enter your phone number"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Role
-          </label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="student">Student</option>
-            <option value="doctor">Doctor</option>
-            <option value="dispensary_staff">Dispensary Staff</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Password
-          </label>
-          <input
-            type="password"
-            placeholder="Create a password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Confirm Password
-          </label>
-          <input
-            type="password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {errorMessage && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
-            {errorMessage}
+            <p className="text-blue-100 mt-4 leading-relaxed">
+              Register for UniHealth to book appointments, submit symptoms,
+              view medical records, and access AI-assisted pre-screening.
+            </p>
           </div>
-        )}
 
-        {message && (
-          <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
-            {message}
-          </div>
-        )}
+          <p className="text-blue-100 text-sm mt-10">
+            Doctor, staff, and admin accounts are created by the system admin.
+          </p>
+        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-blue-600 py-3 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Creating Account..." : "Create Account"}
-        </button>
-      </form>
+        <div className="p-8 md:p-10">
+          <h2 className="text-2xl font-bold text-slate-900">
+            Student Registration
+          </h2>
+          <p className="text-slate-500 mt-2">
+            Create your UniHealth student account.
+          </p>
 
-      <p className="mt-6 text-center text-sm text-slate-600">
-        Already have an account?{" "}
-        <Link to="/" className="text-blue-600 font-medium hover:underline">
-          Back to login
-        </Link>
-      </p>
-    </AuthLayout>
+          {message && (
+            <div className="mt-5 mb-5 bg-red-50 text-red-600 p-3 rounded-xl text-sm">
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="mt-6 grid grid-cols-1 gap-4">
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Full name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Matric number"
+              value={matricNo}
+              onChange={(e) => setMatricNo(e.target.value)}
+              required
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              type="email"
+              placeholder="Student email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Faculty"
+              value={faculty}
+              onChange={(e) => setFaculty(e.target.value)}
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Programme"
+              value={programme}
+              onChange={(e) => setProgramme(e.target.value)}
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              type="number"
+              placeholder="Year of study"
+              value={yearOfStudy}
+              onChange={(e) => setYearOfStudy(e.target.value)}
+            />
+
+            <input
+              className="bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+
+            <button
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold disabled:opacity-60 transition"
+            >
+              {loading ? "Creating account..." : "Register"}
+            </button>
+          </form>
+
+          <p className="text-center text-slate-500 text-sm mt-6">
+            Already have an account?{" "}
+            <Link to="/login" className="text-blue-600 font-semibold">
+              Login
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
-
-export default RegisterPage;
